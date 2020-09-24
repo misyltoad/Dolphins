@@ -63,13 +63,13 @@ namespace
             DX::ThrowIfFailed(device->CreateVertexShader(m_shaderBlob.data(), m_shaderBlob.size(), nullptr, m_vertexShader.ReleaseAndGetAddressOf()));
         }
 
-        virtual void Apply(ID3D11DeviceContext* context) override
+        virtual void __cdecl Apply(ID3D11DeviceContext* context) override
         {
             context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
             context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
         }
 
-        virtual void GetVertexShaderBytecode(_Out_ void const** pShaderByteCode, _Out_ size_t* pByteCodeLength) override
+        virtual void __cdecl GetVertexShaderBytecode(_Out_ void const** pShaderByteCode, _Out_ size_t* pByteCodeLength) override
         {
             *pShaderByteCode = m_shaderBlob.data();
             *pByteCodeLength = m_shaderBlob.size();
