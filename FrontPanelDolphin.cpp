@@ -104,25 +104,10 @@ Sample::Sample() noexcept(false)
     m_ambient[1] = 0.25f;
     m_ambient[2] = 0.25f;
     m_ambient[3] = 0.25f;
-
-    if (IsXboxFrontPanelAvailable())
-    {
-        // Construct the front panel render target
-        m_frontPanelRenderTarget = std::make_unique<FrontPanelRenderTarget>();
-        
-        // Get the default front panel
-        DX::ThrowIfFailed(GetDefaultXboxFrontPanel(m_frontPanelControl.ReleaseAndGetAddressOf()));
-        
-        // Initialize the FrontPanelDisplay object
-        m_frontPanelDisplay = std::make_unique<FrontPanelDisplay>(m_frontPanelControl.Get());
-
-        // Intiailize the FrontPanelInput object
-        m_frontPanelInput = std::make_unique<FrontPanelInput>(m_frontPanelControl.Get());
-    }
 }
 
 // Initialize the Direct3D resources required to run.
-void Sample::Initialize(IUnknown* window)
+void Sample::Initialize(HWND window)
 {
     m_gamePad = std::make_unique<GamePad>();
 
@@ -139,8 +124,6 @@ void Sample::Initialize(IUnknown* window)
 // Executes basic render loop.
 void Sample::Tick()
 {
-    PIXBeginEvent(PIX_COLOR_DEFAULT, L"Frame %I64u", m_frame);
-
     m_timer.Tick([&]()
     {
         Update(m_timer);
@@ -148,15 +131,12 @@ void Sample::Tick()
 
     Render();
 
-    PIXEndEvent();
     m_frame++;
 }
 
 // Updates the world.
 void Sample::Update(DX::StepTimer const& timer)
 {
-    PIXBeginEvent(PIX_COLOR_DEFAULT, L"Update");
-
     float elapsedTime = float(timer.GetElapsedSeconds());
     float totalTime = float(timer.GetTotalSeconds());
     
@@ -232,22 +212,6 @@ void Sample::Update(DX::StepTimer const& timer)
     {
         m_gamePadButtons.Reset();
     }
-
-    // Use the front panel select button to capture the front panel dispaly
-    if (m_frontPanelControl)
-    {
-        auto fpInput = m_frontPanelInput->GetState();
-        m_frontPanelInputButtons.Update(fpInput);
-
-        using ButtonState = FrontPanelInput::ButtonStateTracker::ButtonState;
-
-        if (m_frontPanelInputButtons.buttonSelect == ButtonState::PRESSED)
-        {
-            m_frontPanelDisplay->SaveDDSToFile(L"D:\\FrontPanelScreen.dds");
-        }
-    }
-
-    PIXEndEvent();
 }
 #pragma endregion
 
@@ -266,7 +230,6 @@ void Sample::Render()
     Clear();
 
     auto context = m_deviceResources->GetD3DDeviceContext();
-    PIXBeginEvent(context, PIX_COLOR_DEFAULT, L"Render");
 
     SetWaterColor(0.0f, 0.5f, 1.0f);
 
@@ -302,28 +265,15 @@ void Sample::Render()
     for (unsigned int i = 0; i < m_dolphins.size(); i++)
         DrawDolphin(*m_dolphins[i].get());
 
-    if (m_frontPanelControl)
-    {
-        // Blit to the Front Panel render target and then present to the Front Panel
-        m_frontPanelRenderTarget->GPUBlit(m_deviceResources->GetD3DDeviceContext(), m_mainRenderTargetSRV.Get());
-        auto fpDesc = m_frontPanelDisplay->GetBufferDescriptor();
-        m_frontPanelRenderTarget->CopyToBuffer(m_deviceResources->GetD3DDeviceContext(), fpDesc);
-        m_frontPanelDisplay->Present();
-    }
-
     // Show the new frame.
-    PIXBeginEvent(context, PIX_COLOR_DEFAULT, L"Present");
     m_deviceResources->Present();
     m_graphicsMemory->Commit();
-
-    PIXEndEvent(context);
 }
 
 // Helper method to clear the back buffers.
 void Sample::Clear()
 {
     auto context = m_deviceResources->GetD3DDeviceContext();
-    PIXBeginEvent(context, PIX_COLOR_DEFAULT, L"Clear");
 
     // Clear the views.
     auto renderTarget = m_deviceResources->GetRenderTargetView();
@@ -338,8 +288,6 @@ void Sample::Clear()
     // Set the viewport.
     auto viewport = m_deviceResources->GetScreenViewport();
     context->RSSetViewports(1, &viewport);
-
-    PIXEndEvent(context);
 }
 #pragma endregion
 
@@ -348,13 +296,11 @@ void Sample::Clear()
 void Sample::OnSuspending()
 {
     auto context = m_deviceResources->GetD3DDeviceContext();
-    context->Suspend(0);
 }
 
 void Sample::OnResuming()
 {
     auto context = m_deviceResources->GetD3DDeviceContext();
-    context->Resume();
     m_timer.ResetElapsedTime();
     m_gamePadButtons.Reset();
 }
@@ -367,13 +313,6 @@ void Sample::CreateDeviceDependentResources()
     auto device = m_deviceResources->GetD3DDevice();
     auto context = m_deviceResources->GetD3DDeviceContext();
     m_graphicsMemory = std::make_unique<GraphicsMemory>(device, m_deviceResources->GetBackBufferCount());
-
-    // Set up for rendering to the front panel via the GPU
-    if (m_frontPanelControl)
-    {
-        // Create the front panel render target resources
-        m_frontPanelRenderTarget->CreateDeviceDependentResources(m_frontPanelControl.Get(), device);
-    }
 
     ////////////////////////////////
     //
@@ -479,12 +418,6 @@ void Sample::CreateDeviceDependentResources()
 // Allocate all memory resources that change on a window SizeChanged event.
 void Sample::CreateWindowSizeDependentResources()
 {
-    if (m_frontPanelControl)
-    {
-        // Create a shader resource view for the main render target
-        auto device = m_deviceResources->GetD3DDevice();
-        DX::ThrowIfFailed(device->CreateShaderResourceView(m_deviceResources->GetRenderTarget(), nullptr, m_mainRenderTargetSRV.GetAddressOf()));
-    }
 }
 #pragma endregion
 

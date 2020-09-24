@@ -12,15 +12,10 @@
 // Use the C++ standard templated min/max
 #define NOMINMAX
 
-#include <xdk.h>
-
-#if _XDK_VER < 0x3AD703ED /* XDK Edition 170300 */
-#error This sample requires the March 2017 XDK or later
-#endif
-
 #include <wrl.h>
 
-#include <d3d11_x.h>
+#include <d3d11.h>
+#include <dxgi1_2.h>
 #include <DirectXMath.h>
 #include <DirectXColors.h>
 
@@ -31,14 +26,16 @@
 #include <stdexcept>
 
 #include <stdio.h>
-#include <pix.h>
 
+#include "DirectXHelpers.h"
 #include "CommonStates.h"
 #include "Effects.h"
 #include "GamePad.h"
 #include "GraphicsMemory.h"
 #include "Model.h"
 #include "SimpleMath.h"
+
+#include "DirectXTK/Src/pch.h"
 
 namespace DX
 {

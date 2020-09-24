@@ -11,11 +11,6 @@
 #include "StepTimer.h"
 #include "Dolphin.h"
 
-#include "FrontPanel\FrontPanelRenderTarget.h"
-#include "FrontPanel\FrontPanelDisplay.h"
-#include "FrontPanel\FrontPanelInput.h"
-
-
 // A basic sample implementation that creates a D3D11 device and
 // provides a render loop.
 class Sample
@@ -32,7 +27,7 @@ public:
     Sample& operator= (Sample const&) = delete;
 
     // Initialization and management
-    void Initialize(IUnknown* window);
+    void Initialize(HWND window);
 
     // Basic game loop
     void Tick();
@@ -100,17 +95,7 @@ private:
     float                                           m_waterColor[4];
     float                                           m_ambient[4];
 
-    // Front Panel Render Target
-    // Helper class to convert a GPU resource to grayscale and then render to the Front Panel
-    std::unique_ptr<ATG::FrontPanelRenderTarget>     m_frontPanelRenderTarget; 
-
     // Shader resource view for the whole screen
     // This is the input to the FrontPanelRender target
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_mainRenderTargetSRV;
-
-    // FrontPanel objects
-    Microsoft::WRL::ComPtr<IXboxFrontPanelControl> m_frontPanelControl;
-    std::unique_ptr<ATG::FrontPanelDisplay>        m_frontPanelDisplay;
-    std::unique_ptr<ATG::FrontPanelInput>          m_frontPanelInput;
-    ATG::FrontPanelInput::ButtonStateTracker       m_frontPanelInputButtons;
 };

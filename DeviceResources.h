@@ -10,26 +10,22 @@ namespace DX
     class DeviceResources
     {
     public:
-        static const unsigned int c_FastSemantics   = 0x1;
-        static const unsigned int c_Enable4K_UHD    = 0x2;
-
         DeviceResources(DXGI_FORMAT backBufferFormat = DXGI_FORMAT_B8G8R8A8_UNORM,
                         DXGI_FORMAT depthBufferFormat = DXGI_FORMAT_D32_FLOAT,
-                        UINT backBufferCount = 2,
-                        unsigned int flags = 0);
+                        UINT backBufferCount = 2);
 
         void CreateDeviceResources();
         void CreateWindowSizeDependentResources();
-        void SetWindow(IUnknown* window) { m_window = window; }
+        void SetWindow(HWND window) { m_window = window; }
         void Prepare();
-        void Present(UINT decompressFlags = D3D11X_DECOMPRESS_PROPAGATE_COLOR_CLEAR);
+        void Present();
 
         // Device Accessors.
         RECT GetOutputSize() const { return m_outputSize; }
 
         // Direct3D Accessors.
-        ID3D11DeviceX*          GetD3DDevice() const                    { return m_d3dDevice.Get(); }
-        ID3D11DeviceContextX*   GetD3DDeviceContext() const             { return m_d3dContext.Get(); }
+        ID3D11Device*           GetD3DDevice() const                    { return m_d3dDevice.Get(); }
+        ID3D11DeviceContext*    GetD3DDeviceContext() const             { return m_d3dContext.Get(); }
         IDXGISwapChain1*        GetSwapChain() const                    { return m_swapChain.Get(); }
         D3D_FEATURE_LEVEL       GetDeviceFeatureLevel() const           { return m_d3dFeatureLevel; }
         ID3D11Texture2D*        GetRenderTarget() const                 { return m_renderTarget.Get(); }
@@ -40,12 +36,11 @@ namespace DX
         DXGI_FORMAT             GetDepthBufferFormat() const            { return m_depthBufferFormat; }
         D3D11_VIEWPORT          GetScreenViewport() const               { return m_screenViewport; }
         UINT                    GetBackBufferCount() const              { return m_backBufferCount; }
-        unsigned int            GetDeviceOptions() const                { return m_options; }
 
     private:
         // Direct3D objects.
-        Microsoft::WRL::ComPtr<ID3D11DeviceX>           m_d3dDevice;
-        Microsoft::WRL::ComPtr<ID3D11DeviceContextX>    m_d3dContext;
+        Microsoft::WRL::ComPtr<ID3D11Device>            m_d3dDevice;
+        Microsoft::WRL::ComPtr<ID3D11DeviceContext>     m_d3dContext;
         Microsoft::WRL::ComPtr<IDXGISwapChain1>         m_swapChain;
 
         // Direct3D rendering objects. Required for 3D.
@@ -61,11 +56,8 @@ namespace DX
         UINT                                            m_backBufferCount;
 
         // Cached device properties.
-        IUnknown*                                       m_window;
+        HWND                                            m_window;
         D3D_FEATURE_LEVEL                               m_d3dFeatureLevel;
         RECT                                            m_outputSize;
-
-        // DeviceResources options (see flags above)
-        unsigned int                                    m_options;
     };
 }

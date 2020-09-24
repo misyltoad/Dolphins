@@ -12,41 +12,36 @@ using namespace DX;
 using Microsoft::WRL::ComPtr;
 
 // Constructor for DeviceResources.
-DeviceResources::DeviceResources(DXGI_FORMAT backBufferFormat, DXGI_FORMAT depthBufferFormat, UINT backBufferCount, unsigned int flags) :
+DeviceResources::DeviceResources(DXGI_FORMAT backBufferFormat, DXGI_FORMAT depthBufferFormat, UINT backBufferCount) :
     m_screenViewport{},
     m_backBufferFormat(backBufferFormat),
     m_depthBufferFormat(depthBufferFormat),
     m_backBufferCount(backBufferCount),
     m_window(nullptr),
     m_d3dFeatureLevel(D3D_FEATURE_LEVEL_11_1),
-    m_outputSize{0, 0, 1920, 1080},
-    m_options(flags)
+    m_outputSize{0, 0, 1920, 1080}
 {
 }
 
 // Configures the Direct3D device, and stores handles to it and the device context.
 void DeviceResources::CreateDeviceResources()
 {
-    D3D11X_CREATE_DEVICE_PARAMETERS params = {};
-    params.Version = D3D11_SDK_VERSION;
-
+    UINT flags = 0;
 #ifdef _DEBUG
     // Enable the debug layer.
-    params.Flags = D3D11_CREATE_DEVICE_DEBUG;
-#elif defined(PROFILE)
-    // Enable the instrumented driver.
-    params.Flags = D3D11_CREATE_DEVICE_INSTRUMENTED;
+    flags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
-
-    if (m_options & c_FastSemantics)
-    {
-        params.Flags |= D3D11_CREATE_DEVICE_IMMEDIATE_CONTEXT_FAST_SEMANTICS;
-    }
-
     // Create the Direct3D 11 API device object and a corresponding context.
-    ThrowIfFailed(D3D11XCreateDeviceX(
-        &params,
+    ThrowIfFailed(D3D11CreateDevice(
+        nullptr,
+        D3D_DRIVER_TYPE_HARDWARE,
+        nullptr,
+        flags,
+        &m_d3dFeatureLevel,
+        1,
+        D3D11_SDK_VERSION,
         m_d3dDevice.ReleaseAndGetAddressOf(),
+        nullptr,
         m_d3dContext.ReleaseAndGetAddressOf()
         ));
 
@@ -68,41 +63,14 @@ void DeviceResources::CreateDeviceResources()
         d3dInfoQueue->AddStorageFilterEntries(&filter);
     }
 #endif
-
-    if (m_options & c_Enable4K_UHD)
-    {
-#if _XDK_VER >= 0x3F6803F3 /* XDK Edition 170600 */
-        D3D11X_GPU_HARDWARE_CONFIGURATION hwConfig = {};
-        m_d3dDevice->GetGpuHardwareConfiguration(&hwConfig);
-        if (hwConfig.HardwareVersion >= D3D11X_HARDWARE_VERSION_XBOX_ONE_X)
-        {
-            m_outputSize = { 0, 0, 3840, 2160 };
-#ifdef _DEBUG
-            OutputDebugStringA("INFO: Swapchain using 4k (3840 x 2160) on Xbox One X\n");
-#endif
-        }
-        else
-        {
-            m_options &= ~c_Enable4K_UHD;
-#ifdef _DEBUG
-            OutputDebugStringA("INFO: Swapchain using 1080p (1920 x 1080) on Xbox One or Xbox One S\n");
-#endif
-        }
-#else
-        m_options &= ~c_Enable4K_UHD;
-#ifdef _DEBUG
-        OutputDebugStringA("WARNING: Hardware detection not supported on this XDK edition; Swapchain using 1080p (1920 x 1080)\n");
-#endif
-#endif
-    }
 }
 
 // These resources need to be recreated every time the window size is changed.
 void DeviceResources::CreateWindowSizeDependentResources()
 {
-    if (!m_window)
+    if (!IsWindow(m_window))
     {
-        throw std::exception("Call SetWindow with a valid CoreWindow pointer");
+        throw std::exception("Call SetWindow with a valid HWND");
     }
 
     // Clear the previous window size specific context.
@@ -156,13 +124,14 @@ void DeviceResources::CreateWindowSizeDependentResources()
         swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
         swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
-        swapChainDesc.Flags = DXGIX_SWAP_CHAIN_FLAG_QUANTIZATION_RGB_FULL;
+        swapChainDesc.Flags = 0;
 
         // Create a SwapChain from a CoreWindow.
-        ThrowIfFailed(dxgiFactory->CreateSwapChainForCoreWindow(
+        ThrowIfFailed(dxgiFactory->CreateSwapChainForHwnd(
             m_d3dDevice.Get(),
             m_window,
             &swapChainDesc,
+            nullptr,
             nullptr,
             m_swapChain.GetAddressOf()
             ));
@@ -171,7 +140,7 @@ void DeviceResources::CreateWindowSizeDependentResources()
     // Create a render target view of the swap chain back buffer.
     ThrowIfFailed(m_swapChain->GetBuffer(0, IID_GRAPHICS_PPV_ARGS(m_renderTarget.ReleaseAndGetAddressOf())));
 
-    m_renderTarget->SetName(L"Render target");
+    //m_renderTarget->SetName(L"Render target");
 
     ThrowIfFailed(m_d3dDevice->CreateRenderTargetView(
         m_renderTarget.Get(),
@@ -221,31 +190,13 @@ void DeviceResources::CreateWindowSizeDependentResources()
 // Prepare the render target for rendering.
 void DeviceResources::Prepare()
 {
-    if (m_options & c_FastSemantics)
-    {
-        ThrowIfFailed(m_swapChain->GetBuffer(0, IID_GRAPHICS_PPV_ARGS(m_renderTarget.ReleaseAndGetAddressOf())));
-
-        m_d3dDevice->PlaceSwapChainView(m_renderTarget.Get(), m_d3dRenderTargetView.Get());
-
-        m_d3dContext->InsertWaitOnPresent(0, m_renderTarget.Get());
-    }
 }
 
 // Present the contents of the swap chain to the screen.
-void DeviceResources::Present(UINT decompressFlags)
+void DeviceResources::Present()
 {
-    if ((m_options & c_FastSemantics) != 0 && decompressFlags != 0)
-    {
-        m_d3dContext->DecompressResource(
-            m_renderTarget.Get(), 0, nullptr,
-            m_renderTarget.Get(), 0, nullptr,
-            m_backBufferFormat, decompressFlags);
-    }
-
     // The first argument instructs DXGI to block until VSync, putting the application
     // to sleep until the next VSync. This ensures we don't waste any cycles rendering
     // frames that will never be displayed to the screen.
     ThrowIfFailed(m_swapChain->Present(1, 0));
-
-    // Xbox One apps do not need to handle DXGI_ERROR_DEVICE_REMOVED or DXGI_ERROR_DEVICE_RESET.
 }
